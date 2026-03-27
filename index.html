@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Narvalın Besin Yolculuğu</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(to bottom, #e3f2fd, #bbdefb);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: #0d47a1;
+    }
+
+    .game-shell {
+      width: min(960px, 96vw);
+      background: #f8fbff;
+      border: 3px solid #90caf9;
+      border-radius: 22px;
+      box-shadow: 0 14px 35px rgba(0,0,0,0.15);
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      background: #e3f2fd;
+      border-bottom: 2px solid #bbdefb;
+      flex-wrap: wrap;
+    }
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      color: #1565c0;
+    }
+
+    .title-wrap p {
+      margin: 4px 0 0;
+      font-size: 0.95rem;
+      color: #3949ab;
+    }
+
+    .score-panel {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      background: #ffffff;
+      border: 2px solid #90caf9;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-weight: 700;
+      min-width: 100px;
+      text-align: center;
+      color: #0d47a1;
+    }
+
+    .energy-container {
+      position: relative;
+      width: 140px;
+      height: 32px;
+      background: #eef6ff;
+      border: 2px solid #90caf9;
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .energy-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 100%;
+      background: #4caf50;
+      transition: width 0.1s linear, background-color 0.3s;
+    }
+
+    .energy-text {
+      position: relative;
+      z-index: 1;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #0d47a1;
+      text-shadow: 0 0 3px rgba(255,255,255,0.8);
+    }
+
+    .controls {
+      padding: 10px 18px;
+      background: #eef6ff;
+      border-bottom: 1px solid #c3e0f9;
+      font-size: 0.95rem;
+      color: #283593;
+      text-align: center;
+    }
+
+    .game-area {
+      position: relative;
+      width: 100%;
+      height: 520px;
+      overflow: hidden;
+      background:
+        linear-gradient(to bottom,
+          #e1f5fe 0%,
+          #b3e5fc 25%,
+          #81d4fa 55%,
+          #4fc3f7 80%,
+          #0288d1 100%);
+    }
+
+    .water-surface {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 200%;
+      height: 45px;
+      background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 400 45" xmlns="http://www.w3.org/2000/svg"><path d="M0,25 Q50,45 100,25 T200,25 T300,25 T400,25 V0 H0 Z" fill="%23f7fdff" opacity="0.8"/><path d="M0,35 Q50,15 100,35 T200,35 T300,35 T400,35 V0 H0 Z" fill="%23e1f5fe" opacity="0.6"/></svg>') repeat-x;
+      background-size: 400px 45px;
+      animation: waveMove 6s linear infinite;
+      z-index: 5;
+    }
+
+    @keyframes waveMove {
+      from { transform: translateX(0); }
+      to { transform: translateX(-400px); }
+    }
+
+    .seabed {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 88px;
+      background:
+        radial-gradient(circle at 20% 40%, #e6d3af 0 14px, transparent 15px),
+        radial-gradient(circle at 55% 55%, #d5c09a 0 18px, transparent 19px),
+        radial-gradient(circle at 78% 35%, #e8d7b3 0 12px, transparent 13px),
+        linear-gradient(to top, #b0916b, #cdb28b 62%, #dbbe95 100%);
+    }
+
+    .bg-fish {
+      position: absolute;
+      font-size: 22px;
+      opacity: 0.35;
+      animation: bgSwim linear infinite;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    @keyframes bgSwim {
+      from { transform: translateX(1000px); }
+      to { transform: translateX(-120px); }
+    }
+
+    .player {
+      position: absolute;
+      left: 110px;
+      top: 250px;
+      width: 140px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      filter: drop-shadow(0 6px 6px rgba(0,0,0,0.18));
+      transform-origin: center;
+      z-index: 10;
+    }
+
+    .player.blink {
+      animation: blink 0.15s linear 3;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0.25; }
+    }
+
+    .narwhal-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .entity {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .collectible {
+      font-size: 46px;
+      filter: drop-shadow(0 4px 4px rgba(0,0,0,0.14));
+    }
+
+    .obstacle {
+      font-size: 54px;
+      filter: drop-shadow(0 5px 5px rgba(0,0,0,0.15));
+    }
+
+    .entity.obstacle svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .ship-entity {
+      position: absolute;
+      font-size: 55px;
+      user-select: none;
+      pointer-events: none;
+      z-index: 20;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.25));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sound-wave {
+      position: absolute;
+      font-size: 26px;
+      user-select: none;
+      pointer-events: none;
+      z-index: 15;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    }
+
+    .label {
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      white-space: nowrap;
+      color: #e0f7fa;
+      font-weight: 700;
+      background: rgba(1, 44, 73, 0.7);
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    .fact-card {
+      position: absolute;
+      left: 50%;
+      top: 55px;
+      transform: translateX(-50%);
+      width: min(88%, 620px);
+      background: rgba(255,255,255,0.96);
+      border: 2px solid #64b5f6;
+      border-radius: 18px;
+      padding: 12px 16px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+      text-align: center;
+      font-weight: 700;
+      color: #1565c0;
+      display: none;
+      z-index: 20;
+    }
+
+    .fact-card.show {
+      display: block;
+      animation: factIn 0.35s ease;
+    }
+
+    @keyframes factIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(1, 31, 56, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+      padding: 20px;
+    }
+
+    .panel {
+      width: min(95%, 720px);
+      max-height: 90%;
+      overflow-y: auto;
+      background: #f8fcff;
+      border: 3px solid #81d4fa;
+      border-radius: 24px;
+      padding: 30px 22px;
+      text-align: center;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+    }
+
+    .panel h2 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 1.8rem;
+      color: #0d47a1;
+    }
+
+    .panel p {
+      color: #3949ab;
+      line-height: 1.5;
+      margin: 10px 0;
+    }
+
+    .narwhal-preview {
+      width: 140px;
+      height: 90px;
+      margin: 0 auto 15px;
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,0.15));
+      transform: scaleX(-1);
+    }
+
+    .emoji-big {
+      font-size: 60px;
+      margin-bottom: 10px;
+    }
+
+    .btn-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 24px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 14px 32px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: #1976d2;
+      color: white;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+      transition: all 0.2s ease;
+    }
+
+    button:hover { background: #1565c0; transform: translateY(-2px); }
+    button:active { transform: translateY(1px); }
+
+    button.secondary {
+      background: #78909c;
+    }
+    button.secondary:hover { background: #607d8b; }
+
+    .legend-content {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px dashed #b3e5fc;
+      text-align: left;
+    }
+
+    .legend-title {
+      font-weight: 700;
+      color: #0d47a1;
+      margin-bottom: 12px;
+      display: block;
+      text-align: center;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .mini-card {
+      background: white;
+      border: 1.5px solid #bbdefb;
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      color: #283593;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .mini-card strong {
+      color: #0d47a1;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .legend-icon {
+      font-size: 36px;
+      margin-bottom: 8px;
+      width: 60px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 700px) {
+      .game-area { height: 480px; }
+      .player { left: 70px; width: 110px; height: 68px; }
+      .controls { font-size: 0.85rem; }
+      .panel h2 { font-size: 1.5rem; }
+      .mini-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- SVG Şablonları -->
+  <svg id="svg-templates" style="display:none;">
+    <symbol id="orca-template" viewBox="0 0 140 100">
+      <path d="M10,45 C15,25 45,15 80,25 C110,35 130,65 125,85 C120,95 100,100 80,95 C55,90 20,75 10,45" fill="#333a41" />
+      <path d="M20,60 C35,50 65,45 90,60 C110,75 115,85 100,90 C80,95 40,90 20,60" fill="#ffffff" opacity="0.9" />
+      <path d="M60,32 C70,10 90,5 105,10 L90,32 C80,28 70,30 60,32" fill="#333a41" />
+      <ellipse cx="38" cy="36" rx="10" ry="5" fill="#ffffff" transform="rotate(-15, 38, 36)" />
+      <circle cx="28" cy="45" r="3" fill="#000000" />
+      <path d="M125,85 C135,95 140,90 140,80 L120,70 C115,80 120,80 125,85" fill="#333a41" />
+      <path d="M55,65 C50,80 65,90 75,85 L70,65 C65,68 60,68 55,65" fill="#222" />
+    </symbol>
+
+    <symbol id="narwhal-template" viewBox="0 0 160 100">
+      <polygon points="45,53 45,57 0,55" fill="#f4eee8"/>
+      <line x1="35" y1="54" x2="10" y2="55" stroke="#d0c8c0" stroke-width="1.5"/>
+      <line x1="45" y1="54" x2="20" y2="55" stroke="#d0c8c0" stroke-width="1.5"/>
+      <path d="M140,55 C140,20 60,30 40,55 C60,80 140,90 140,55" fill="#889dae"/>
+      <path d="M50,65 C70,75 110,80 130,65 C115,75 75,70 50,65" fill="#cdd8e0"/>
+      <path d="M135,55 C145,40 160,30 160,45 C150,55 140,55 135,55" fill="#6d8191"/>
+      <path d="M135,55 C145,70 160,80 160,65 C150,55 140,55 135,55" fill="#6d8191"/>
+      <circle cx="55" cy="48" r="3.5" fill="#111820"/>
+      <circle cx="54" cy="47" r="1.5" fill="#fff"/>
+      <circle cx="75" cy="40" r="3" fill="#546a7d"/>
+      <circle cx="85" cy="35" r="4" fill="#546a7d"/>
+      <circle cx="95" cy="42" r="2.5" fill="#546a7d"/>
+      <circle cx="105" cy="38" r="4.5" fill="#546a7d"/>
+      <circle cx="115" cy="45" r="2" fill="#546a7d"/>
+      <circle cx="85" cy="48" r="2" fill="#546a7d"/>
+      <circle cx="125" cy="42" r="3" fill="#546a7d"/>
+      <circle cx="100" cy="50" r="2.5" fill="#546a7d"/>
+      <path d="M75,65 C70,85 85,90 95,80 C90,75 80,70 75,65" fill="#6d8191"/>
+    </symbol>
+  </svg>
+
+  <div class="game-shell">
+    <div class="topbar">
+      <div class="title-wrap">
+        <h1>Narvalın Besin Yolculuğu</h1>
+        <p>Denizlerin tek boynuzlu atıyla derinlikleri keşfet.</p>
+      </div>
+      <div class="score-panel">
+        <div class="pill">Puan: <span id="score">0</span></div>
+        <div class="pill">Rekor: <span id="bestScore">0</span></div>
+        <div class="pill">Can: <span id="livesText">3</span></div>
+        <div class="energy-container">
+          <div id="energyFill" class="energy-fill"></div>
+          <span class="energy-text">Enerji</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <strong>Kontroller:</strong> Yukarı Ok / W / Space = yukarı çık • Aşağı Ok / S = aşağı in
+    </div>
+
+    <div id="gameArea" class="game-area">
+      <div class="water-surface"></div>
+      <div class="seabed"></div>
+
+      <div id="factCard" class="fact-card"></div>
+
+      <div id="player" class="player">
+        <svg class="narwhal-svg" viewBox="0 0 160 100">
+          <use href="#narwhal-template"/>
+        </svg>
+      </div>
+
+      <div id="startOverlay" class="overlay">
+        <div class="panel">
+          <div class="narwhal-preview">
+            <svg viewBox="0 0 160 100" style="width:100%; height:100%;">
+              <use href="#narwhal-template"/>
+            </svg>
+          </div>
+          <h2>Narvalın Besin Yolculuğu</h2>
+          <p>Narvalı kontrol ederek kalamar ve balıkları topla. Enerjini yüksek tut. Avcılardan ve tepede gezen gemi seslerinden kaç!</p>
+          
+          <div class="btn-row">
+            <button id="startBtn">Oyunu Başlat</button>
+          </div>
+
+          <div class="legend-content">
+            <span class="legend-title">Oyun Nesneleri</span>
+            <div class="mini-grid">
+              <div class="mini-card"><div class="legend-icon">🦑</div><strong>Kalamar</strong>Besin kaynağı. (+10 Puan)</div>
+              <div class="mini-card"><div class="legend-icon">🐟</div><strong>Kutup Morinası</strong>İyi enerji verir. (+20 Puan)</div>
+              <div class="mini-card">
+                <div class="legend-icon">
+                  <svg style="width:100%; height:100%;"><use href="#orca-template"/></svg>
+                </div>
+                <strong>Orka</strong>Tehlikeli avcı!
+              </div>
+              <div class="mini-card"><div class="legend-icon">🧊</div><strong>Buz Bloğu</strong>Çarpmamaya dikkat et.</div>
+              <div class="mini-card"><div class="legend-icon">🚢 🔊</div><strong>Gemi Sonarı</strong>İleriden çaprazlama ses dalgası atar.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="gameOverOverlay" class="overlay" style="display:none;">
+        <div class="panel">
+          <div class="emoji-big">🌊</div>
+          <h2>Oyun Bitti</h2>
+          <p>Topladığın puan: <strong id="finalScore">0</strong></p>
+          <p id="gameOverText">Narval yeni bir maceraya hazır.</p>
+          <div class="btn-row">
+            <button id="restartBtn">Tekrar Oyna</button>
+            <button id="closeBtn" class="secondary">Giriş Ekranına Dön</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const gameArea = document.getElementById("gameArea");
+    const player = document.getElementById("player");
+    const scoreEl = document.getElementById("score");
+    const bestScoreEl = document.getElementById("bestScore");
+    const livesText = document.getElementById("livesText");
+    const factCard = document.getElementById("factCard");
+    const energyFill = document.getElementById("energyFill");
+
+    const startOverlay = document.getElementById("startOverlay");
+    const gameOverOverlay = document.getElementById("gameOverOverlay");
+    const finalScore = document.getElementById("finalScore");
+    const gameOverText = document.getElementById("gameOverText");
+
+    const startBtn = document.getElementById("startBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const closeBtn = document.getElementById("closeBtn");
+
+    const GAME_W = () => gameArea.clientWidth;
+    const GAME_H = () => gameArea.clientHeight;
+
+    const playerState = {
+      x: 110,
+      y: 250,
+      w: 140, 
+      h: 80,
+      moveUp: false,
+      moveDown: false
+    };
+
+    const MAX_ENERGY = 100;
+    let currentEnergy = MAX_ENERGY;
+    let score = 0;
+    let bestScore = Number(localStorage.getItem("narvalBestScore") || 0);
+    let speed = 4.8;
+    let running = false;
+    let animationFrame = null;
+    let spawnTimer = 0;
+    let bgFishTimer = 0;
+    let infoIndex = 0;
+    let lastFactScore = 0;
+    let sonarLives = 3;
+
+    const collectibles = [];
+    const obstacles = [];
+    const backgroundFish = [];
+    const ships = [];
+    const sounds = [];
+
+    const facts = [
+      "Narvallar, benzersiz görünümleri nedeniyle denizlerin 'tek boynuzlu atları' olarak bilinir.",
+      "O uzun 'boynuz' aslında 3 metreye kadar uzayabilen devasa bir sarmal diştir.",
+      "Dişin üzerinde milyonlarca sinir ucu bulunur; bu sayede sudaki tuzluluk değişimlerini hissederler.",
+      "Narvallar kalamar aramak için 1500 metre derine kadar dalabilirler.",
+      "Gemi gürültüleri (sonar) sese çok duyarlı narvalların yön bulmasını zorlaştırır."
+    ];
+
+    function updateBestScore() {
+      bestScoreEl.textContent = bestScore;
+      localStorage.setItem("narvalBestScore", String(bestScore));
+    }
+
+    updateBestScore();
+
+    function showFact(text) {
+      factCard.textContent = "ℹ️ " + text;
+      factCard.classList.add("show");
+      clearTimeout(showFact._timer);
+      showFact._timer = setTimeout(() => {
+        factCard.classList.remove("show");
+      }, 3500);
+    }
+
+    function createEntity(type, content, x, y, w, h, labelText, isSVG = false) {
+      const el = document.createElement("div");
+      el.className = `entity ${type}`;
+      el.style.left = x + "px";
+      el.style.top = y + "px";
+      el.style.width = w + "px";
+      el.style.height = h + "px";
+      
+      if(isSVG) {
+        el.innerHTML = content;
+      } else {
+        el.textContent = content;
+      }
+
+      if (labelText) {
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = labelText;
+        el.appendChild(label);
+      }
+
+      gameArea.appendChild(el);
+      return el;
+    }
+
+    function spawnCollectible() {
+      const kinds = [
+        { emoji: "🦑", label: "Kalamar", points: 10, size: 52, energy: 15 },
+        { emoji: "🐟", label: "Morina", points: 20, size: 48, energy: 25 },
+        { emoji: "🦐", label: "Karides", points: 50, size: 45, energy: 40 }
+      ];
+
+      let kind;
+      const r = Math.random();
+      if (r < 0.08) kind = kinds[2];
+      else if (r < 0.42) kind = kinds[1];
+      else kind = kinds[0];
+
+      const x = GAME_W() + 30;
+      const y = randomBetween(110, GAME_H() - 150);
+
+      const obj = {
+        x, y, w: kind.size, h: kind.size, points: kind.points, energy: kind.energy,
+        element: createEntity("collectible", kind.emoji, x, y, kind.size, kind.size, kind.label)
+      };
+      collectibles.push(obj);
+    }
+
+    function spawnObstacle() {
+      const kinds = [
+        { id: "orca", label: "Orka", w: 90, h: 65, isSVG: true, 
+          svg: '<svg viewBox="0 0 140 100"><use href="#orca-template"/></svg>' },
+        { id: "ice", emoji: "🧊", label: "Buz Bloğu", w: 55, h: 55, isSVG: false }
+      ];
+
+      const kind = kinds[Math.floor(Math.random() * kinds.length)];
+      const x = GAME_W() + 40;
+      const y = randomBetween(105, GAME_H() - 150);
+
+      const content = kind.isSVG ? kind.svg : kind.emoji;
+
+      const obj = {
+        x, y, w: kind.w, h: kind.h, id: kind.id,
+        element: createEntity("obstacle", content, x, y, kind.w, kind.h, kind.label, kind.isSVG)
+      };
+      obstacles.push(obj);
+    }
+
+    function spawnBackgroundFish() {
+      const fish = document.createElement("div");
+      fish.className = "bg-fish";
+      fish.textContent = Math.random() > 0.5 ? "🐟" : "🐠";
+      fish.style.top = randomBetween(120, GAME_H() - 160) + "px";
+      fish.style.animationDuration = randomBetween(10, 18) + "s";
+      fish.style.fontSize = randomBetween(18, 26) + "px";
+      gameArea.appendChild(fish);
+
+      backgroundFish.push(fish);
+
+      setTimeout(() => {
+        fish.remove();
+        const i = backgroundFish.indexOf(fish);
+        if (i >= 0) backgroundFish.splice(i, 1);
+      }, 21000);
+    }
+
+    // Gemi Yönetimi (Sabit Gemi)
+    function manageShip() {
+      if (ships.length === 0) {
+        const w = 75, h = 60;
+        const x = GAME_W() - 100; // İleride, ekranın sağ üstünde sabit
+        const y = 5; // Su yüzeyi hizası
+
+        const el = document.createElement("div");
+        el.className = "ship-entity";
+        el.textContent = "🚢";
+        el.style.left = x + "px";
+        el.style.top = y + "px";
+        el.style.width = w + "px";
+        el.style.height = h + "px";
+        el.style.transform = "scaleX(-1)"; // Sola baksın
+
+        gameArea.appendChild(el);
+        ships.push({ x, y, w, h, element: el });
+      }
+
+      if (ships.length > 0) {
+        const ship = ships[0];
+        
+        // Ekran boyutu değişirse diye her zaman sağa sabitle
+        ship.x = GAME_W() - 100;
+        ship.element.style.left = ship.x + "px";
+
+        // İleriden rastgele aralıklarla ses dalgaları fırlat
+        if (Math.random() < 0.015) {
+          spawnSound(ship);
+        }
+      }
+    }
+
+    function spawnSound(ship) {
+      const el = document.createElement("div");
+      el.className = "sound-wave";
+      el.textContent = "🔊"; 
+      const w = 30;
+      const h = 30;
+      const x = ship.x + ship.w / 2 - w / 2;
+      const y = ship.y + ship.h - 10;
+      el.style.left = x + "px";
+      el.style.top = y + "px";
+      el.style.width = w + "px";
+      el.style.height = h + "px";
+
+      gameArea.appendChild(el);
+      
+      // Seslerin farklı eğimlerle bize doğru gelmesi için rastgele dikey hız
+      const vy = randomBetween(2, 4) + Math.random();
+      sounds.push({ x, y, w, h, vy: vy, element: el });
+    }
+
+    function resetGame() {
+      score = 0; speed = 4.8; spawnTimer = 0; bgFishTimer = 0;
+      infoIndex = 0; lastFactScore = 0;
+      sonarLives = 3;
+      currentEnergy = MAX_ENERGY;
+      
+      scoreEl.textContent = score;
+      livesText.textContent = sonarLives;
+
+      playerState.y = 250;
+      playerState.moveUp = false;
+      playerState.moveDown = false;
+      player.classList.remove("blink");
+
+      collectibles.forEach(o => o.element.remove());
+      obstacles.forEach(o => o.element.remove());
+      backgroundFish.forEach(f => f.remove());
+      ships.forEach(s => s.element.remove());
+      sounds.forEach(s => s.element.remove());
+
+      collectibles.length = 0; obstacles.length = 0; backgroundFish.length = 0;
+      ships.length = 0; sounds.length = 0;
+
+      updatePlayer();
+      factCard.classList.remove("show");
+    }
+
+    function startGame() {
+      resetGame();
+      startOverlay.style.display = "none";
+      gameOverOverlay.style.display = "none";
+      running = true;
+      loop();
+    }
+
+    function endGame(reasonText) {
+      running = false;
+      cancelAnimationFrame(animationFrame);
+      player.classList.add("blink");
+
+      finalScore.textContent = score;
+      gameOverText.textContent = reasonText;
+
+      if (score > bestScore) {
+        bestScore = score;
+        updateBestScore();
+      }
+
+      setTimeout(() => {
+        gameOverOverlay.style.display = "flex";
+      }, 350);
+    }
+
+    function updatePlayer() {
+      const upperBound = 95;
+      const lowerBound = GAME_H() - 88 - playerState.h + 20;
+
+      if (playerState.moveUp) playerState.y -= 6;
+      if (playerState.moveDown) playerState.y += 6;
+
+      playerState.y = Math.max(upperBound, Math.min(lowerBound, playerState.y));
+
+      player.style.left = playerState.x + "px";
+      player.style.top = playerState.y + "px";
+
+      // Narval yönü (Sola dönük SVG)
+      if (playerState.moveUp) player.style.transform = "scaleX(-1) rotate(-12deg)";
+      else if (playerState.moveDown) player.style.transform = "scaleX(-1) rotate(12deg)";
+      else player.style.transform = "scaleX(-1) rotate(0deg)";
+    }
+
+    function rectsOverlap(a, b) {
+      return (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
+    }
+
+    function playerRect() {
+      return { 
+        x: playerState.x + 30, 
+        y: playerState.y + 20, 
+        w: playerState.w - 50, 
+        h: playerState.h - 40 
+      };
+    }
+
+    function updateEntities(arr, isObstacle = false) {
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const obj = arr[i];
+        obj.x -= speed;
+        obj.element.style.left = obj.x + "px";
+
+        if (obj.x + obj.w < -120) {
+          obj.element.remove();
+          arr.splice(i, 1);
+          continue;
+        }
+
+        if (rectsOverlap(playerRect(), obj)) {
+          if (isObstacle) {
+            let text = "Narval bir engele çarptı.";
+            if (obj.id === "orca") text = "Katil balinadan (Orka) kaçamadın!";
+            else if (obj.id === "ice") text = "Buz kütlesine çarptın.";
+            endGame(text);
+            return true;
+          } else {
+            score += obj.points;
+            currentEnergy = Math.min(MAX_ENERGY, currentEnergy + obj.energy);
+            scoreEl.textContent = score;
+            obj.element.remove();
+            arr.splice(i, 1);
+            if (score % 100 < obj.points) speed += 0.35;
+            if (score - lastFactScore >= 100) {
+              showFact(facts[infoIndex % facts.length]);
+              infoIndex++;
+              lastFactScore = score;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    function loop() {
+      if (!running) return;
+
+      // Enerji Azalması
+      currentEnergy -= 0.10; 
+      if (currentEnergy <= 0) {
+        currentEnergy = 0;
+        energyFill.style.width = "0%";
+        endGame("Enerjin tamamen tükendi. Narval açlıktan bitkin düştü!");
+        return;
+      }
+
+      // Enerji Barı Görünümü
+      energyFill.style.width = currentEnergy + "%";
+      if (currentEnergy > 50) energyFill.style.background = "#4caf50";
+      else if (currentEnergy > 20) energyFill.style.background = "#ff9800";
+      else energyFill.style.background = "#f44336";
+
+      updatePlayer();
+      manageShip();
+
+      // Düşen Ses Dalgalarını Yönet
+      for (let i = sounds.length - 1; i >= 0; i--) {
+        const sound = sounds[i];
+        sound.y += sound.vy;
+        sound.x -= speed; // Tam oyun hızıyla bize doğru (sola) gelsin
+        
+        sound.element.style.top = sound.y + "px";
+        sound.element.style.left = sound.x + "px";
+
+        if (sound.y > GAME_H() || sound.x < -50) {
+          sound.element.remove();
+          sounds.splice(i, 1);
+          continue;
+        }
+
+        if (rectsOverlap(playerRect(), sound)) {
+          sound.element.remove();
+          sounds.splice(i, 1);
+          
+          sonarLives--;
+          livesText.textContent = sonarLives;
+          
+          // Karakterin yanıp sönmesini sağlayarak hasar efekti oluştur
+          player.classList.remove("blink");
+          void player.offsetWidth; 
+          player.classList.add("blink");
+
+          if (sonarLives <= 0) {
+            endGame("Gemi gürültüsü (sonar) seni tamamen sersemletti!");
+            return;
+          }
+        }
+      }
+
+      spawnTimer++; bgFishTimer++;
+      
+      if (bgFishTimer > 150) { spawnBackgroundFish(); bgFishTimer = 0; }
+      
+      if (spawnTimer > 45) {
+        if (Math.random() < 0.6) spawnCollectible();
+        else spawnObstacle();
+        spawnTimer = 0;
+      }
+      
+      if (updateEntities(collectibles, false)) return;
+      if (updateEntities(obstacles, true)) return;
+      
+      animationFrame = requestAnimationFrame(loop);
+    }
+
+    function randomBetween(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    window.addEventListener("keydown", (e) => {
+      const key = e.key.toLowerCase();
+      if (["arrowup", "w", " "].includes(key)) { e.preventDefault(); playerState.moveUp = true; }
+      if (["arrowdown", "s"].includes(key)) { e.preventDefault(); playerState.moveDown = true; }
+    });
+    
+    window.addEventListener("keyup", (e) => {
+      const key = e.key.toLowerCase();
+      if (["arrowup", "w", " "].includes(key)) playerState.moveUp = false;
+      if (["arrowdown", "s"].includes(key)) playerState.moveDown = false;
+    });
+
+    startBtn.addEventListener("click", startGame);
+    restartBtn.addEventListener("click", startGame);
+    closeBtn.addEventListener("click", () => {
+      gameOverOverlay.style.display = "none";
+      startOverlay.style.display = "flex";
+    });
+    
+    updatePlayer();
+  </script>
+</body>
+</html>

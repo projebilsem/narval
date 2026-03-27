@@ -206,12 +206,10 @@
     }
 
     .collectible {
-      font-size: 46px;
       filter: drop-shadow(0 4px 4px rgba(0,0,0,0.14));
     }
 
     .obstacle {
-      font-size: 54px;
       filter: drop-shadow(0 5px 5px rgba(0,0,0,0.15));
     }
 
@@ -295,7 +293,7 @@
     }
 
     .panel {
-      width: min(95%, 720px);
+      width: min(95%, 750px);
       max-height: 90%;
       overflow-y: auto;
       background: #f8fcff;
@@ -379,7 +377,7 @@
 
     .mini-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 12px;
     }
 
@@ -509,6 +507,7 @@
             <div class="mini-grid">
               <div class="mini-card"><div class="legend-icon">🦑</div><strong>Kalamar</strong>Besin kaynağı. (+10 Puan)</div>
               <div class="mini-card"><div class="legend-icon">🐟</div><strong>Kutup Morinası</strong>İyi enerji verir. (+20 Puan)</div>
+              <div class="mini-card"><div class="legend-icon">💎</div><strong>Elmas</strong>Bilgi verir, 5sn mola.</div>
               <div class="mini-card">
                 <div class="legend-icon">
                   <svg style="width:100%; height:100%;"><use href="#orca-template"/></svg>
@@ -573,12 +572,14 @@
     let bestScore = Number(localStorage.getItem("narvalBestScore") || 0);
     let speed = 4.8;
     let running = false;
+    let isPaused = false;
     let animationFrame = null;
     let spawnTimer = 0;
     let bgFishTimer = 0;
     let infoIndex = 0;
-    let lastFactScore = 0;
+    let shipCooldown = 0;
     let sonarLives = 3;
+    let pauseTimeout = null;
 
     const collectibles = [];
     const obstacles = [];
@@ -601,13 +602,13 @@
 
     updateBestScore();
 
-    function showFact(text) {
-      factCard.textContent = "ℹ️ " + text;
+    function showFact(text, duration = 3500) {
+      factCard.innerHTML = "ℹ️ " + text + (duration > 3500 ? "<br><br><small><i>(Oyun 5 saniye duraklatıldı)</i></small>" : "");
       factCard.classList.add("show");
       clearTimeout(showFact._timer);
       showFact._timer = setTimeout(() => {
         factCard.classList.remove("show");
-      }, 3500);
+      }, duration);
     }
 
     function createEntity(type, content, x, y, w, h, labelText, isSVG = false) {
@@ -622,6 +623,7 @@
         el.innerHTML = content;
       } else {
         el.textContent = content;
+        el.style.fontSize = w + "px"; // Emojilerin container'a tam sığmasını sağla
       }
 
       if (labelText) {
@@ -637,22 +639,24 @@
 
     function spawnCollectible() {
       const kinds = [
-        { emoji: "🦑", label: "Kalamar", points: 10, size: 52, energy: 15 },
-        { emoji: "🐟", label: "Morina", points: 20, size: 48, energy: 25 },
-        { emoji: "🦐", label: "Karides", points: 50, size: 45, energy: 40 }
+        { emoji: "🦑", label: "Kalamar", points: 10, size: 36, energy: 15, isDiamond: false },
+        { emoji: "🐟", label: "Morina", points: 20, size: 32, energy: 25, isDiamond: false },
+        { emoji: "🦐", label: "Karides", points: 50, size: 30, energy: 40, isDiamond: false },
+        { emoji: "💎", label: "Bilgi", points: 50, size: 36, energy: 10, isDiamond: true }
       ];
 
       let kind;
       const r = Math.random();
-      if (r < 0.08) kind = kinds[2];
-      else if (r < 0.42) kind = kinds[1];
-      else kind = kinds[0];
+      if (r < 0.08) kind = kinds[3]; // %8 ihtimalle Elmas
+      else if (r < 0.20) kind = kinds[2]; // %12 ihtimalle Karides
+      else if (r < 0.55) kind = kinds[1]; // %35 ihtimalle Morina
+      else kind = kinds[0]; // %45 ihtimalle Kalamar
 
       const x = GAME_W() + 30;
       const y = randomBetween(110, GAME_H() - 150);
 
       const obj = {
-        x, y, w: kind.size, h: kind.size, points: kind.points, energy: kind.energy,
+        x, y, w: kind.size, h: kind.size, points: kind.points, energy: kind.energy, isDiamond: kind.isDiamond,
         element: createEntity("collectible", kind.emoji, x, y, kind.size, kind.size, kind.label)
       };
       collectibles.push(obj);
@@ -681,10 +685,10 @@
     function spawnBackgroundFish() {
       const fish = document.createElement("div");
       fish.className = "bg-fish";
-      fish.textContent = Math.random() > 0.5 ? "🐟" : "🐠";
+      fish.textContent = "🐟";
       fish.style.top = randomBetween(120, GAME_H() - 160) + "px";
-      fish.style.animationDuration = randomBetween(10, 18) + "s";
-      fish.style.fontSize = randomBetween(18, 26) + "px";
+      fish.style.animationDuration = randomBetween(12, 20) + "s";
+      fish.style.fontSize = randomBetween(16, 26) + "px";
       gameArea.appendChild(fish);
 
       backgroundFish.push(fish);
@@ -752,9 +756,11 @@
 
     function resetGame() {
       score = 0; speed = 4.8; spawnTimer = 0; bgFishTimer = 0;
-      infoIndex = 0; lastFactScore = 0;
+      infoIndex = 0;
       sonarLives = 3;
       currentEnergy = MAX_ENERGY;
+      isPaused = false;
+      clearTimeout(pauseTimeout);
       
       scoreEl.textContent = score;
       livesText.textContent = sonarLives;
@@ -804,11 +810,14 @@
     }
 
     function updatePlayer() {
-      const upperBound = 95;
-      const lowerBound = GAME_H() - 88 - playerState.h + 20;
+      const upperBound = 35; // Su yüzeyi sınırı
+      const lowerBound = GAME_H() - 88 - playerState.h + 20; // Zemin sınırı
 
-      if (playerState.moveUp) playerState.y -= 6;
-      if (playerState.moveDown) playerState.y += 6;
+      // Enerjiye göre dinamik hız (daha belirgin bir yavaşlama yapıldı)
+      let moveSpeed = 1 + (currentEnergy / MAX_ENERGY) * 7.5; 
+
+      if (playerState.moveUp) playerState.y -= moveSpeed;
+      if (playerState.moveDown) playerState.y += moveSpeed;
 
       playerState.y = Math.max(upperBound, Math.min(lowerBound, playerState.y));
 
@@ -859,11 +868,19 @@
             scoreEl.textContent = score;
             obj.element.remove();
             arr.splice(i, 1);
+            
             if (score % 100 < obj.points) speed += 0.35;
-            if (score - lastFactScore >= 100) {
-              showFact(facts[infoIndex % facts.length]);
+
+            // Elmas (Bilgi Kartı) Yenildiğinde Duraklatma Tetikle
+            if (obj.isDiamond) {
+              isPaused = true;
+              showFact(facts[infoIndex % facts.length], 5000);
               infoIndex++;
-              lastFactScore = score;
+              
+              clearTimeout(pauseTimeout);
+              pauseTimeout = setTimeout(() => {
+                isPaused = false;
+              }, 5000);
             }
           }
         }
@@ -873,6 +890,12 @@
 
     function loop() {
       if (!running) return;
+
+      if (isPaused) {
+        // Oyun duraklatıldığında state güncellenmez ama ekran/CSS animasyonları donmasın diye request devam eder
+        animationFrame = requestAnimationFrame(loop);
+        return;
+      }
 
       // Enerji Azalması
       currentEnergy -= 0.10; 
